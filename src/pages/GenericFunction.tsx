@@ -1,5 +1,5 @@
 import {Button, Card, Col, Form, InputNumber, message, Row, Table} from "antd";
-import {Coordinates, Mafs, Plot, Theme} from "mafs";
+import Big from "big.js";
 import "mafs/core.css";
 import React, {useState} from "react";
 import {Header} from "../components/Header";
@@ -21,14 +21,9 @@ const columns = [
     key: 'fees',
   },
   {
-    title: 'Price A',
-    dataIndex: 'priceA',
-    key: 'priceA',
-  },
-  {
-    title: 'Price B',
-    dataIndex: 'priceB',
-    key: 'priceB',
+    title: 'Price',
+    dataIndex: 'price',
+    key: 'price',
   },
   {
     title: 'Liquidity Token A',
@@ -50,25 +45,21 @@ const columns = [
 interface DataType {
   tokenA: string;
   tokenB: string;
-  tokenALiq: number;
-  tokenBLiq: number;
-  priceA: string;
-  priceB: string;
+  tokenALiq: string;
+  tokenBLiq: string;
+  price: string;
   fees: string;
-  curve: number;
+  curve: string;
 }
 
 type Props = {
-  constantFunction: Function,
-  constantFunctionDer: Function,
-  priceFunction: Function,
+  priceFunction: (A: Big, B: Big) => Big,
   priceFunctionDesc: string,
-  constantCalc: Function,
-  constant: number,
+  constantCalc: (A: Big, B: Big) => Big,
   title: string
 }
 
-export const GenericFunction = ({constantFunction, constantFunctionDer, priceFunction, constant, constantCalc, title, priceFunctionDesc} : Props) => {
+export const GenericFunction = ({priceFunction, constantCalc, title} : Props) => {
   const [messageApi, contextHolder] = message.useMessage()
   const [addDisabled, setAddDisabled] = useState<boolean>(false);
   const [initialSet, setInitialSet] = useState<boolean>(false);
@@ -76,15 +67,7 @@ export const GenericFunction = ({constantFunction, constantFunctionDer, priceFun
   const [initialTokenB, setInitialTokenB] = useState<number>(250);
   const [tokenA, setTokenA] = useState<number>(100);
   const [tokenB, setTokenB] = useState<number>(250);
-  const [priceA, setPriceA] = useState<number>(0);
-  const [priceB, setPriceB] = useState<number>(0);
-  const [receiveA, setReceiveA] = useState<number>(0);
-  const [receiveB, setReceiveB] = useState<number>(0);
-  const [newAQty, setNewAQty] = useState<number>(0)
-  const [newBQty, setNewBQty] = useState<number>(0)
-  const [curve, setCurve] = useState<number>(0)
-  const [paidFeesA, setPaidFeesA] = useState<number>(0)
-  const [paidFeesB, setPaidFeesB] = useState<number>(0)
+  const [priceB, setPriceB] = useState<Big>(new Big(0));
   const [fees, setFees] = useState<number>(0);
   const [swappedTokenA, setSwappedTokenA] = useState<number>(0);
   const [swappedTokenB, setSwappedTokenB] = useState<number>(0);
@@ -110,15 +93,18 @@ export const GenericFunction = ({constantFunction, constantFunctionDer, priceFun
     setTokenB(initialTokenB);
     setInitialSet(true);
     setAddDisabled(true);
+    const price = priceFunction(new Big(tokenB), new Big(tokenA));
+    setPriceB(price);
+    const initialCurve = constantCalc(new Big(initialTokenA), new Big(initialTokenB)).toNumber();
+    console.log(initialCurve)
     setData([{
       tokenA: "",
       tokenB: "",
-      priceA: "",
-      priceB: "",
       fees: "",
-      tokenALiq: tokenA,
-      tokenBLiq: tokenB,
-      curve: constantCalc(tokenA, tokenB)
+      price: `${price.toFixed(5)}`,
+      tokenALiq: tokenA.toFixed(5),
+      tokenBLiq: tokenB.toFixed(5),
+      curve: `${initialCurve}`
     }])
   }
 
@@ -147,110 +133,77 @@ export const GenericFunction = ({constantFunction, constantFunctionDer, priceFun
     return true;
   }
 
-  const swapTokenA = () => {
-    if (!check(swappedTokenA, swappedTokenB, tokenB)) {
-      return;
-    }
-    const realInput = swappedTokenA;
-    const price = calcPrice(tokenA, tokenB, realInput, fees);
-    const input = realInput * (1 - fees);
-    const output = input * price;
-    setPaidFeesA(realInput * fees)
-    setNewAQty(tokenA + input)
-    setNewBQty(tokenB - output)
-    setCurve(constantCalc(tokenA + input, tokenB - output))
-    setReceiveB(output);
-    setPriceB(price)
-
-    const swap: DataType = {
-      tokenA: `+${input}`,
-      tokenB: `-${output}`,
-      priceB: `${price} B/A`,
-      priceA: "",
-      fees: `${paidFeesA} A`,
-      tokenALiq: tokenA + input,
-      tokenBLiq: tokenB - output,
-      curve: Math.floor(curve)
-    }
-    setData([...data, swap])
-    setTokenA(newAQty);
-    setTokenB(newBQty);
-    resetData();
-  };
-
   const resetData = () => {
     setSwappedTokenA(0);
     setSwappedTokenB(0);
-    setReceiveA(0);
-    setReceiveB(0);
-    setPaidFeesA(0)
-    setPaidFeesB(0)
-
   }
 
-  const swapTokenB = () => {
-    if (!check(swappedTokenB, swappedTokenA, tokenA)) {
-      return;
-    }
-    const realInput = swappedTokenB;
-    const price = calcPrice(tokenA, tokenB, realInput, fees);
-    const input = realInput * (1 - fees);
-    const output = input * price;
-    setPaidFeesB(realInput * fees)
-    setNewAQty(tokenA - output)
-    setNewBQty(tokenB + input)
-    setCurve(constantCalc(tokenA - output, tokenB + input))
-    setReceiveB(output);
-    setPriceB(price)
-
-    const swap: DataType = {
-      tokenA: `-${output}`,
-      tokenB: `+${input}`,
-      priceA: `${price} A/B`,
-      priceB: "",
-      fees: `${paidFeesB} B`,
-      tokenALiq: tokenA - output,
-      tokenBLiq: tokenB + input,
-      curve: Math.floor(curve)
-    }
-    setData([...data, swap])
-    setTokenA(newAQty);
-    setTokenB(newBQty);
-    resetData();
-  };
-
-  const calcPrice = (base: number, counter: number, delta: number, fees: number) => {
-    counter = counter - delta * (1 - fees);
-    return priceFunction(base, counter);
+  const buy = (output: number, tokenIn: number, tokenOut: number): { tokenInUpdated: Big, tokenOutUpdated: Big, input: number, output: number, price: Big} => {
+    const tokenOutUpdated = new Big(tokenOut - output);
+    const price = priceFunction(new Big(tokenIn), tokenOutUpdated);
+    const input = price.mul(new Big(output));
+    const tokenInUpdated = input.add(new Big(tokenIn));
+    return { tokenInUpdated, tokenOutUpdated, input: input.toNumber(), output, price }
   }
 
   const setSwapTokenA = (value: number | null) => {
-    const realInput = Number(value ?? 0);
-    setSwappedTokenA(realInput);
-    const price = calcPrice(tokenB, tokenA, realInput, fees);
-    const input = realInput * (1 - fees);
-    const output = input * price;
-    setPaidFeesA(realInput * fees)
-    setNewAQty(tokenA + input)
-    setNewBQty(tokenB - output)
-    setCurve(constantCalc(tokenA + input, tokenB - output))
-    setReceiveB(output);
-    setPriceB(price)
+    const tokens = Number(value ?? 0)
+    const { input, output, price } = buy(tokens, tokenB, tokenA);
+    setSwappedTokenA(output);
+    setSwappedTokenB(input);
+    setPriceB(price);
+  };
+
+  const swapTokenA = () => {
+    const { tokenInUpdated, tokenOutUpdated, input, output, price } = buy(swappedTokenA, tokenB, tokenA);
+    setTokenA(tokenOutUpdated.toNumber());
+    setTokenB(tokenInUpdated.toNumber());
+    const initialCurve = constantCalc(tokenInUpdated, tokenOutUpdated).toNumber();
+    const swap: DataType = {
+      tokenA: `-${output.toFixed(5)}`,
+      tokenB: `+${input.toFixed(5)}`,
+      price: `${price.toFixed(5)} B/A`,
+      fees: `0 B`,
+      tokenALiq: `${tokenOutUpdated.toFixed(5)}`,
+      tokenBLiq: `${tokenInUpdated.toFixed(5)}`,
+      curve: `${initialCurve}`
+    }
+    setData([...data, swap])
+    resetData();
   };
 
   const setSwapTokenB = (value: number | null) => {
-    const realInput = Number(value ?? 0);
-    setSwappedTokenB(realInput);
-    const price = calcPrice(tokenA, tokenB, realInput, fees);
-    const input = realInput * (1 - fees);
-    const output = input * price;
-    setPaidFeesB(realInput * fees)
-    setNewAQty(tokenA - output)
-    setNewBQty(tokenB + input)
-    setCurve(constantCalc(tokenA - output, tokenB + input))
-    setReceiveA(output);
-    setPriceA(price)
+    const tokens = Number(value ?? 0)
+    const { input, output, price } = buy(tokens, tokenA, tokenB);
+    setSwappedTokenB(output);
+    setSwappedTokenA(input);
+    setPriceB(price.pow(-1));
   };
+
+  const swapTokenB = () => {
+    const { tokenInUpdated, tokenOutUpdated, input, output, price } = buy(swappedTokenB, tokenA, tokenB);
+    setTokenB(tokenOutUpdated.toNumber());
+    setTokenA(tokenInUpdated.toNumber());
+    const curve = constantCalc(tokenInUpdated, tokenOutUpdated).toNumber();
+    setPriceB(price);
+    const swap: DataType = {
+      tokenB: `-${output.toFixed(5)}`,
+      tokenA: `+${input.toFixed(5)}`,
+      price: `${price.pow(-1).toFixed(5)} B/A`,
+      fees: `0 A`,
+      tokenALiq: tokenInUpdated.toFixed(5),
+      tokenBLiq: tokenOutUpdated.toFixed(5),
+      curve: `${curve}`
+    }
+    setData([...data, swap])
+    resetData();
+  };
+
+  const calcPrice = (base: number, counter: number, delta: number, fees: number): Big => {
+    counter = counter - delta * (1 - fees);
+    return priceFunction(new Big(base), new Big(counter));
+  }
+
 
 
   const reset = () => {
@@ -261,6 +214,7 @@ export const GenericFunction = ({constantFunction, constantFunctionDer, priceFun
     setData([])
     setAddDisabled(false);
     setInitialSet(false);
+    setPriceB(new Big(0));
   }
 
   return <div>
@@ -278,19 +232,12 @@ export const GenericFunction = ({constantFunction, constantFunctionDer, priceFun
             <Form.Item><Button onClick={reset} >Reset</Button></Form.Item>
           </Form>
           <Form.Item label="Fees" style={{ marginBottom: 0}}><b>{fees}</b></Form.Item>
-          <h3>Swap A 🔄 B</h3>
+          <Form.Item label="Price"><b>{priceB.toFixed(5)} B/A</b></Form.Item>
           <Form layout="inline">
-            <Form.Item label="Token A:" required={true}><InputNumber value={swappedTokenA} onChange={setSwapTokenA} min={0}/></Form.Item>
-            <Form.Item label="Token B"> <InputNumber value={receiveB} disabled={true} controls={false} inputMode="none"/></Form.Item>
-            <Form.Item label=""><Button onClick={swapTokenA} type="primary" disabled={!addDisabled}>Swap</Button></Form.Item>
-            <Form.Item label="Price"><b>{priceB} B/A</b></Form.Item>
-          </Form>
-          <h3>Swap B 🔄 A</h3>
-          <Form layout="inline">
-            <Form.Item label="Token B:" required={true}><InputNumber value={swappedTokenB} onChange={setSwapTokenB} min={0}/></Form.Item>
-            <Form.Item label="Token A"> <InputNumber value={receiveA} disabled={true} controls={false} inputMode="none"/></Form.Item>
-            <Form.Item label=""><Button onClick={swapTokenB} type="primary" disabled={!addDisabled}>Swap</Button></Form.Item>
-            <Form.Item label="Price"><b>{priceA} A/B</b></Form.Item>
+            <Form.Item label="Token A:"><InputNumber value={swappedTokenA} onChange={setSwapTokenA} min={0} disabled={!addDisabled}/></Form.Item>
+            <Form.Item label="Token B:"><InputNumber value={swappedTokenB} onChange={setSwapTokenB} min={0} disabled={!addDisabled}/></Form.Item>
+            <Form.Item label=""><Button onClick={swapTokenA} type="primary" disabled={!addDisabled}>Buy A</Button></Form.Item>
+            <Form.Item label=""><Button onClick={swapTokenB} type="primary" disabled={!addDisabled}>Buy B</Button></Form.Item>
           </Form>
           <Table columns={columns} dataSource={data}/>
         </Card>

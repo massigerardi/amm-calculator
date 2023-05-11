@@ -11,6 +11,8 @@
     "@types/react": "^18.2.6",
     "@types/react-dom": "^18.2.4",
     "antd": "5.4.7",
+    "big.js": "^6.2.1",
+    "bigdecimal": "^0.6.1",
     "mafs": "^0.16.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
@@ -43,5 +45,8 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "@types/big.js": "^6.1.6"
   }
 }

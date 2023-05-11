@@ -1,18 +1,18 @@
 import "mafs/core.css";
+import Big from "big.js";
 import React from "react";
-import {constantSum, constantSumDer} from "../utils/functions";
 import {GenericFunction} from "./GenericFunction";
 
 export const ConstantSum = () => {
-  const priceFunc = (A: number, B: number) => {
-    return 1;
+  const priceFunc = (A: Big, B: Big):Big => {
+    return new Big(1);
   }
 
-  const constantCalc = (A: number, B: number) => {
-    return A + B;
+  const constantCalc = (A: Big, B: Big): Big => {
+    return A.add(B);
   }
   return <div>
-    <GenericFunction constantFunction={constantSum} constantFunctionDer={constantSumDer} priceFunction={priceFunc} constant={5} constantCalc={constantCalc} title="x + y = c" priceFunctionDesc="1"/>
+    <GenericFunction priceFunction={priceFunc} constantCalc={constantCalc} title="x + y = c" priceFunctionDesc="1"/>
   </div>
 
 };
