@@ -13,6 +13,6 @@ export const ConstantProduct = () => {
 
 
   return <div>
-    <GenericFunction priceFunction={priceFunc} constantCalc={constantCalc} title="x * y = c" priceFunctionDesc="y/x"/>
+    <GenericFunction priceFunction={priceFunc} constantCalc={constantCalc} title="Constant Product: x * y = c" />
   </div>
 }

@@ -14,7 +14,7 @@ export const ConstantFunction = () => {
 
 
   return <div>
-    <GenericFunction priceFunction={priceFunc} constantCalc={constantCalc} title="x^2 + 5 * y = c TODO" priceFunctionDesc="???"/>
+    <GenericFunction priceFunction={priceFunc} constantCalc={constantCalc} title="Constant Function: x^2 + 5 * y = c TODO" />
   </div>
 
 };

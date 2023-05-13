@@ -54,7 +54,6 @@ interface DataType {
 
 type Props = {
   priceFunction: (A: Big, B: Big) => Big,
-  priceFunctionDesc: string,
   constantCalc: (A: Big, B: Big) => Big,
   title: string
 }
@@ -63,10 +62,10 @@ export const GenericFunction = ({priceFunction, constantCalc, title} : Props) =>
   const [messageApi, contextHolder] = message.useMessage()
   const [addDisabled, setAddDisabled] = useState<boolean>(false);
   const [initialSet, setInitialSet] = useState<boolean>(false);
-  const [initialTokenA, setInitialTokenA] = useState<number>(100);
-  const [initialTokenB, setInitialTokenB] = useState<number>(250);
-  const [tokenA, setTokenA] = useState<number>(100);
-  const [tokenB, setTokenB] = useState<number>(250);
+  const [initialTokenA, setInitialTokenA] = useState<number>(0);
+  const [initialTokenB, setInitialTokenB] = useState<number>(0);
+  const [tokenA, setTokenA] = useState<number>(0);
+  const [tokenB, setTokenB] = useState<number>(0);
   const [priceB, setPriceB] = useState<Big>(new Big(0));
   const [fees, setFees] = useState<number>(0);
   const [swappedTokenA, setSwappedTokenA] = useState<number>(0);
@@ -89,6 +88,7 @@ export const GenericFunction = ({priceFunction, constantCalc, title} : Props) =>
   };
 
   const setInitialLiquidity = () => {
+    if (initialTokenB === 0 || initialTokenA === 0) return;
     setTokenA(initialTokenA);
     setTokenB(initialTokenB);
     setInitialSet(true);
@@ -102,8 +102,8 @@ export const GenericFunction = ({priceFunction, constantCalc, title} : Props) =>
       tokenB: "",
       fees: "",
       price: `${price.toFixed(5)}`,
-      tokenALiq: tokenA.toFixed(5),
-      tokenBLiq: tokenB.toFixed(5),
+      tokenALiq: initialTokenA.toFixed(5),
+      tokenBLiq: initialTokenB.toFixed(5),
       curve: `${initialCurve}`
     }])
   }
@@ -138,32 +138,35 @@ export const GenericFunction = ({priceFunction, constantCalc, title} : Props) =>
     setSwappedTokenB(0);
   }
 
-  const buy = (output: number, tokenIn: number, tokenOut: number): { tokenInUpdated: Big, tokenOutUpdated: Big, input: number, output: number, price: Big} => {
-    const tokenOutUpdated = new Big(tokenOut - output);
-    const price = priceFunction(new Big(tokenIn), tokenOutUpdated);
-    const input = price.mul(new Big(output));
-    const tokenInUpdated = input.add(new Big(tokenIn));
-    return { tokenInUpdated, tokenOutUpdated, input: input.toNumber(), output, price }
+  const buy = (dx: number, tokenIn: number, X: number): { tokenInUpdated: Big, tokenOutUpdated: Big, cost: number, amount: number, price: Big, paidFees: Big} => {
+    const tokenOutUpdated = new Big(X - dx);
+    const price = priceFunction(new Big(tokenIn), new Big(tokenOutUpdated));
+    const dy = price.mul(new Big(dx));
+    const paidFees = dy.mul(new Big(fees))
+    const cost = dy.add(paidFees);
+    const tokenInUpdated = dy.add(new Big(tokenIn));
+    return { tokenInUpdated, tokenOutUpdated, cost: cost.toNumber(), amount: dx, price, paidFees }
   }
 
   const setSwapTokenA = (value: number | null) => {
     const tokens = Number(value ?? 0)
-    const { input, output, price } = buy(tokens, tokenB, tokenA);
-    setSwappedTokenA(output);
-    setSwappedTokenB(input);
+    const { cost, amount, price } = buy(tokens, tokenB, tokenA);
+    setSwappedTokenA(amount);
+    setSwappedTokenB(cost);
     setPriceB(price);
   };
 
   const swapTokenA = () => {
-    const { tokenInUpdated, tokenOutUpdated, input, output, price } = buy(swappedTokenA, tokenB, tokenA);
+    if (!check(swappedTokenB, swappedTokenA, tokenA)) return;
+    const { tokenInUpdated, tokenOutUpdated, cost, amount, price, paidFees } = buy(swappedTokenA, tokenB, tokenA);
     setTokenA(tokenOutUpdated.toNumber());
     setTokenB(tokenInUpdated.toNumber());
     const initialCurve = constantCalc(tokenInUpdated, tokenOutUpdated).toNumber();
     const swap: DataType = {
-      tokenA: `-${output.toFixed(5)}`,
-      tokenB: `+${input.toFixed(5)}`,
+      tokenA: `-${amount.toFixed(5)}`,
+      tokenB: `+${cost.toFixed(5)}`,
       price: `${price.toFixed(5)} B/A`,
-      fees: `0 B`,
+      fees: `${paidFees.toFixed(5)} B`,
       tokenALiq: `${tokenOutUpdated.toFixed(5)}`,
       tokenBLiq: `${tokenInUpdated.toFixed(5)}`,
       curve: `${initialCurve}`
@@ -174,23 +177,24 @@ export const GenericFunction = ({priceFunction, constantCalc, title} : Props) =>
 
   const setSwapTokenB = (value: number | null) => {
     const tokens = Number(value ?? 0)
-    const { input, output, price } = buy(tokens, tokenA, tokenB);
-    setSwappedTokenB(output);
-    setSwappedTokenA(input);
+    const { cost, amount, price } = buy(tokens, tokenA, tokenB);
+    setSwappedTokenB(amount);
+    setSwappedTokenA(cost);
     setPriceB(price.pow(-1));
   };
 
   const swapTokenB = () => {
-    const { tokenInUpdated, tokenOutUpdated, input, output, price } = buy(swappedTokenB, tokenA, tokenB);
+    if (!check(swappedTokenA, swappedTokenB, tokenB)) return;
+    const { tokenInUpdated, tokenOutUpdated, cost, amount, price, paidFees } = buy(swappedTokenB, tokenA, tokenB);
     setTokenB(tokenOutUpdated.toNumber());
     setTokenA(tokenInUpdated.toNumber());
     const curve = constantCalc(tokenInUpdated, tokenOutUpdated).toNumber();
     setPriceB(price);
     const swap: DataType = {
-      tokenB: `-${output.toFixed(5)}`,
-      tokenA: `+${input.toFixed(5)}`,
+      tokenB: `-${amount.toFixed(5)}`,
+      tokenA: `+${cost.toFixed(5)}`,
       price: `${price.pow(-1).toFixed(5)} B/A`,
-      fees: `0 A`,
+      fees: `${paidFees.toFixed(5)} A`,
       tokenALiq: tokenInUpdated.toFixed(5),
       tokenBLiq: tokenOutUpdated.toFixed(5),
       curve: `${curve}`
@@ -199,18 +203,12 @@ export const GenericFunction = ({priceFunction, constantCalc, title} : Props) =>
     resetData();
   };
 
-  const calcPrice = (base: number, counter: number, delta: number, fees: number): Big => {
-    counter = counter - delta * (1 - fees);
-    return priceFunction(new Big(base), new Big(counter));
-  }
-
-
-
   const reset = () => {
     setTokenA(100);
     setTokenB(250);
     setSwapTokenB(0)
     setSwapTokenA(0)
+    setFees(0)
     setData([])
     setAddDisabled(false);
     setInitialSet(false);
@@ -225,21 +223,45 @@ export const GenericFunction = ({priceFunction, constantCalc, title} : Props) =>
         <Card title={<code>{title}</code>}>
           <h3>Init</h3>
           <Form layout="inline">
-            <Form.Item label="Token A:"><InputNumber value={initialTokenA} onChange={changeTokenA} disabled={initialSet}/></Form.Item>
-            <Form.Item label="Token B:"><InputNumber value={initialTokenB} onChange={changeTokenB} disabled={initialSet}/></Form.Item>
-            <Form.Item label="Fees"><InputNumber value={fees} onChange={addFees} disabled={initialSet}/></Form.Item>
+            <Form.Item label="Tokens:"><InputNumber value={initialTokenA} onChange={changeTokenA} addonAfter="A" disabled={initialSet}/></Form.Item>
+            <Form.Item><InputNumber value={initialTokenB} onChange={changeTokenB} addonAfter="B" disabled={initialSet}/></Form.Item>
+            <Form.Item label="Fees"><InputNumber value={fees} onChange={addFees} disabled={initialSet} addonAfter="%" max={100} min={0} step={0.01} /></Form.Item>
             <Form.Item ><Button onClick={setInitialLiquidity} disabled={addDisabled} type="primary">Create Pool</Button></Form.Item>
             <Form.Item><Button onClick={reset} >Reset</Button></Form.Item>
           </Form>
+          <h3>Swap</h3>
           <Form.Item label="Fees" style={{ marginBottom: 0}}><b>{fees}</b></Form.Item>
-          <Form.Item label="Price"><b>{priceB.toFixed(5)} B/A</b></Form.Item>
-          <Form layout="inline">
-            <Form.Item label="Token A:"><InputNumber value={swappedTokenA} onChange={setSwapTokenA} min={0} disabled={!addDisabled}/></Form.Item>
-            <Form.Item label="Token B:"><InputNumber value={swappedTokenB} onChange={setSwapTokenB} min={0} disabled={!addDisabled}/></Form.Item>
+          <Form layout="inline" style={{marginBottom: 20}}>
+            <Form.Item label="Tokens:"><InputNumber value={swappedTokenA} addonAfter="A" onChange={setSwapTokenA} min={0} disabled={!addDisabled}/></Form.Item>
+            <Form.Item><InputNumber value={swappedTokenB} addonAfter="B" onChange={setSwapTokenB} min={0} disabled={!addDisabled}/></Form.Item>
+            <Form.Item label="Price"><b>{priceB.toFixed(5)} B/A</b></Form.Item>
             <Form.Item label=""><Button onClick={swapTokenA} type="primary" disabled={!addDisabled}>Buy A</Button></Form.Item>
             <Form.Item label=""><Button onClick={swapTokenB} type="primary" disabled={!addDisabled}>Buy B</Button></Form.Item>
           </Form>
-          <Table columns={columns} dataSource={data}/>
+          <Table columns={columns} dataSource={data} />
+        </Card>
+      </Col>
+      <Col>
+        <Card title="How to">
+          <ol>
+            <li>Set up initial liquidity and possible fees;</li>
+            <li>Create Pool;</li>
+            <li>Add Token B or Token A in the Buy form;</li>
+            <li>Price will change with quantity;</li>
+            <li>When Buy A or B token, the variation in the pool are shown;</li>
+            <li>Repeat the process to see how the price changes;</li>
+            <li>Reset to start again with a clean pool.</li>
+          </ol>
+          <h4>Table Columns</h4>
+          <ul>
+            <li><b>Token A</b>: variation of token A</li>
+            <li><b>Token B</b>: variation of token B</li>
+            <li><b>Collected Fees</b>: fees from the sales; <br/>collected fees do not contribute to the pool liquidity</li>
+            <li><b>Price</b>: price for the sale</li>
+            <li><b>Liquidity Token A</b>: the quantity of token A left in the pool</li>
+            <li><b>Liquidity Token B</b>: the quantity of token B left in the pool</li>
+            <li><b>Liquidity Constant</b>: the constant from the AMM function for this pool</li>
+          </ul>
         </Card>
       </Col>
     </Row>

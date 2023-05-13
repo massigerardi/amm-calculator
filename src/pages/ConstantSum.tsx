@@ -12,7 +12,7 @@ export const ConstantSum = () => {
     return A.add(B);
   }
   return <div>
-    <GenericFunction priceFunction={priceFunc} constantCalc={constantCalc} title="x + y = c" priceFunctionDesc="1"/>
+    <GenericFunction priceFunction={priceFunc} constantCalc={constantCalc} title="Constant Sum: x + y = c" />
   </div>
 
 };
