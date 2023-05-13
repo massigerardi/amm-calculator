@@ -4,22 +4,22 @@ import "mafs/core.css";
 import React, {useState} from "react";
 import {Header} from "../components/Header";
 import {HowTo} from "../components/howto";
-import {columns, DataType } from "../components/TxTable";
+import {columns, DataType} from "../components/TxTable";
 
 type Props = {
-  priceFunction: (A: Big, B: Big) => Big,
-  constantCalc: (A: Big, B: Big) => Big,
+  priceFunction: (Y: Big, X: Big, dx: Big) => Big,
+  constantCalc: (Y: Big, X: Big) => Big,
   title: string
 }
 
-export const GenericFunction = ({priceFunction, constantCalc, title} : Props) => {
+export const HighLevelFunction = ({priceFunction, constantCalc, title} : Props) => {
   const [messageApi, contextHolder] = message.useMessage()
   const [addDisabled, setAddDisabled] = useState<boolean>(false);
   const [initialSet, setInitialSet] = useState<boolean>(false);
   const [initY, setInitY] = useState<number>(0);
   const [initX, setInitX] = useState<number>(0);
-  const [Y, setY] = useState<number>(0);
   const [X, setX] = useState<number>(0);
+  const [Y, setY] = useState<number>(0);
   const [price, setPrice] = useState<Big>(new Big(0));
   const [fees, setFees] = useState<number>(0);
   const [dy, setDy] = useState<number>(0);
@@ -43,13 +43,13 @@ export const GenericFunction = ({priceFunction, constantCalc, title} : Props) =>
 
   const setInitialLiquidity = () => {
     if (initX === 0 || initY === 0) return;
-    setY(initY);
     setX(initX);
+    setY(initY);
     setInitialSet(true);
     setAddDisabled(true);
-    const price = priceFunction(new Big(initX), new Big(initY));
+    const price = priceFunction(new Big(initY), new Big(initX), new Big(0));
     setPrice(price);
-    const initialCurve = constantCalc(new Big(initY), new Big(initX)).toNumber();
+    const initialCurve = constantCalc(new Big(initX), new Big(initY)).toNumber();
     console.log(initialCurve)
     setData([{
       dy: "",
@@ -63,22 +63,22 @@ export const GenericFunction = ({priceFunction, constantCalc, title} : Props) =>
     }])
   }
 
-  const check = (deltaOut: number, tokenOut: number, tokenIn: number):boolean => {
-    if (tokenIn === 0 || tokenOut === 0) {
+  const check = (input: number, output: number, token: number):boolean => {
+    if (token === 0) {
       messageApi.error({
         content: "No Liquidity",
         duration: 10
       })
       return false;
     }
-    if (deltaOut === 0) {
+    if (input === 0) {
       messageApi.error({
         content: "No Swap Value",
         duration: 10
       })
       return false;
     }
-    if (deltaOut >= tokenOut) {
+    if (output > token) {
       messageApi.error({
         content: "No Enough Liquidity",
         duration: 10
@@ -93,69 +93,37 @@ export const GenericFunction = ({priceFunction, constantCalc, title} : Props) =>
     setDx(0);
   }
 
-  const buy = (deltaOut: number, tokenIn: number, tokenOut: number): { tokenInUpdated: Big, tokenOutUpdated: Big, cost: number, deltaIn: Big, deltaOut: Big, price: Big, paidFees: Big} => {
-    const tokenOutUpdated = new Big(tokenOut - deltaOut);
-    const price = priceFunction(new Big(tokenIn), new Big(tokenOutUpdated));
-    const deltaIn = price.mul(new Big(deltaOut));
-    const paidFees = deltaIn.mul(new Big(fees))
-    const cost = deltaIn.add(paidFees);
-    const tokenInUpdated = deltaIn.add(new Big(tokenIn));
-    return { tokenInUpdated, tokenOutUpdated, cost: cost.toNumber(), deltaIn, deltaOut: new Big(deltaOut), price, paidFees }
+  const buy = (dx: number): { newY: Big, newX: Big, cost: number, DY: Big, price: Big, paidFees: Big} => {
+    const price = priceFunction(new Big(Y), new Big(X), new Big(dx));
+    const dy = price.mul(new Big(dx));
+    const paidFees = dy.mul(new Big(fees))
+    const cost = dy.add(paidFees);
+    return { newY: new Big(Y).add(dy), newX: new Big(X - dx), cost: cost.toNumber(), DY: dy, price, paidFees }
   }
 
-  const setSwapTokenY = (value: number | null) => {
-    const deltaOut = Number(value ?? 0)
-    if (!check(deltaOut, Y, X)) return;
-    const { cost, price } = buy(deltaOut, X, Y);
-    setDy(deltaOut);
-    setDx(cost);
-    setPrice(price);
-  };
-
-  const swapTokenY = () => {
-    if (!check(dy, Y, X)) return;
-    const { tokenInUpdated, tokenOutUpdated, cost, deltaIn, deltaOut, price, paidFees } = buy(dy, X, Y);
-    setY(tokenOutUpdated.toNumber());
-    setX(tokenInUpdated.toNumber());
-    const initialCurve = constantCalc(tokenInUpdated, tokenOutUpdated).toNumber();
-    const swap: DataType = {
-      dy: `-${deltaOut.toFixed(5)}`,
-      dx: `+${deltaIn.toFixed(5)}`,
-      cost: `+${cost.toFixed(5)}`,
-      price: `${price.toFixed(5)} B/A`,
-      fees: `${paidFees.toFixed(5)} B`,
-      liqY: `${tokenOutUpdated.toFixed(5)}`,
-      liqX: `${tokenInUpdated.toFixed(5)}`,
-      curve: `${initialCurve}`
-    }
-    setData([...data, swap])
-    resetData();
-  };
-
   const setSwapTokenX = (value: number | null) => {
-    const deltaOut = Number(value ?? 0)
-    if (!check(deltaOut, X, Y)) return;
-    const { cost, price } = buy(deltaOut, Y, X);
-    setDx(deltaOut);
+    const dx = Number(value ?? 0)
+    const { cost, price } = buy(dx);
+    setDx(dx);
     setDy(cost);
-    setPrice(price.pow(-1));
+    setPrice(price);
   };
 
-  const swapTokenX = () => {
-    if (!check(dx, X, Y)) return;
-    const { tokenInUpdated, tokenOutUpdated, cost, deltaIn, deltaOut, price, paidFees } = buy(dx, Y, X);
-    setX(tokenOutUpdated.toNumber());
-    setY(tokenInUpdated.toNumber());
-    const curve = constantCalc(tokenInUpdated, tokenOutUpdated).toNumber();
+  const buyTokenX = () => {
+    if (!check(dy, dx, Y)) return;
+    const { newY, newX, cost, DY, price, paidFees } = buy(dx);
+    setX(newX.toNumber());
+    setY(newY.toNumber());
+    const curve = constantCalc(newX, newY).toNumber();
     setPrice(price);
     const swap: DataType = {
-      dx: `-${deltaOut.toFixed(5)}`,
-      dy: `+${deltaIn.toFixed(5)}`,
+      dx: `-${dx.toFixed(5)}`,
       cost: `+${cost.toFixed(5)}`,
-      price: `${price.pow(-1).toFixed(5)} B/A`,
+      dy: `+${DY.toFixed(5)}`,
+      price: `${price.toFixed(5)}`,
       fees: `${paidFees.toFixed(5)} A`,
-      liqY: tokenInUpdated.toFixed(5),
-      liqX: tokenOutUpdated.toFixed(5),
+      liqX: newY.toFixed(5),
+      liqY: newX.toFixed(5),
       curve: `${curve}`
     }
     setData([...data, swap])
@@ -163,10 +131,9 @@ export const GenericFunction = ({priceFunction, constantCalc, title} : Props) =>
   };
 
   const reset = () => {
-    setY(100);
-    setX(250);
+    setX(100);
+    setY(250);
     setSwapTokenX(0)
-    setSwapTokenY(0)
     setFees(0)
     setData([])
     setAddDisabled(false);
@@ -191,11 +158,10 @@ export const GenericFunction = ({priceFunction, constantCalc, title} : Props) =>
           <h3>Swap</h3>
           <Form.Item label="Fees" style={{ marginBottom: 0}}><b>{fees}</b></Form.Item>
           <Form layout="inline" style={{marginBottom: 20}}>
-            <Form.Item label="Tokens:"><InputNumber value={dy} addonAfter="dy" onChange={setSwapTokenY} min={0} disabled={!addDisabled}/></Form.Item>
+            <Form.Item label="Tokens:"><InputNumber value={dy} addonAfter="dy" min={0} disabled={true}/></Form.Item>
             <Form.Item><InputNumber value={dx} addonAfter="dx" onChange={setSwapTokenX} min={0} disabled={!addDisabled}/></Form.Item>
             <Form.Item label="Price"><b>{price.toFixed(5)} B/A</b></Form.Item>
-            <Form.Item label=""><Button onClick={swapTokenY} type="primary" disabled={!addDisabled}>Buy Y</Button></Form.Item>
-            <Form.Item label=""><Button onClick={swapTokenX} type="primary" disabled={!addDisabled}>Buy X</Button></Form.Item>
+            <Form.Item label=""><Button onClick={buyTokenX} type="primary" disabled={!addDisabled}>Buy X</Button></Form.Item>
           </Form>
           <Table columns={columns} dataSource={data} />
         </Card>

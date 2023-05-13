@@ -1,5 +1,4 @@
 import {Checkbox, Col, Form, InputNumber, Row} from 'antd';
-import type {CheckboxChangeEvent} from 'antd/es/checkbox';
 import {Coordinates, Mafs, Plot, Theme} from "mafs";
 import "mafs/core.css";
 import React, {useState} from "react";
@@ -25,7 +24,7 @@ export const Curves = () => {
     setK(value ?? 1)
   }
 
-  const onChange = (curve: string) => (e: CheckboxChangeEvent) => {
+  const onChange = (curve: string) => () => {
     switch (curve) {
       case ("A"): if (opacityA === 1) setOpacityA(0); else setOpacityA(1); break;
       case ("B"): if (opacityB === 1) setOpacityB(0); else setOpacityB(1); break;
@@ -51,8 +50,8 @@ export const Curves = () => {
       <Col span={2}>
         <Mafs
           viewBox={{x: [0, 10], y: [0, 10]}}
-          width={800}
-          height={800}
+          width={600}
+          height={600}
         >
           <Coordinates.Cartesian
             xAxis={{

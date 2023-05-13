@@ -1,20 +1,20 @@
 import Big from "big.js";
 import "mafs/core.css";
 import React from "react";
-import {GenericFunction} from "./GenericFunction";
+import {HighLevelFunction} from "./HighLevelFunction";
 
 export const ConstantFunction = () => {
-  const priceFunc = (A: Big, B: Big): Big => {
-    return A.div(B);
+  const priceFunc = (Y: Big, X: Big, dx: Big): Big => {
+    return X.mul(2).minus(dx).div(5);
   }
 
-  const constantCalc = (A: Big, B: Big): Big => {
-    return A.pow(2).add(B.mul(new Big(5)));
+  const constantCalc = (X: Big, Y: Big): Big => {
+    return X.pow(2).add(Y.mul(new Big(5)));
   }
 
 
   return <div>
-    <GenericFunction priceFunction={priceFunc} constantCalc={constantCalc} title="Constant Function: x^2 + 5 * y = c TODO" />
+    <HighLevelFunction priceFunction={priceFunc} constantCalc={constantCalc} title="Constant Function: x^2 + 5 * y = c TODO" />
   </div>
 
 };
