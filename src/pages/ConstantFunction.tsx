@@ -12,9 +12,18 @@ export const ConstantFunction = () => {
     return X.pow(2).add(Y.mul(new Big(5)));
   }
 
+  const priceEquation = `
+    x<sup>2</sup> + 5y = k
+    (x-dx)<sup>2</sup> + 5(y + dy) = k
+    x<sup>2</sup> -2xdx + dx<sup>2</sup> + 5y + 5dy = k
+    <s>x<sup>2</sup></s> -2xdx + dx<sup>2</sup> + <s>5y</s> + 5dy = <s>k</s>
+    5dy - 2xdx + dx<sup>2</sup> = 0
+    dy = dx (2x - dx) / 5 
+    P = dy/dx = (2x - dx) / 5 
+  `
 
   return <div>
-    <HighLevelFunction priceFunction={priceFunc} constantCalc={constantCalc} title="Constant Function: x^2 + 5 * y = c TODO" />
+    <HighLevelFunction priceFunction={priceFunc} constantCalc={constantCalc} title="Constant Function: x^2 + 5 * y = c" priceEquation={priceEquation} />
   </div>
 
 };

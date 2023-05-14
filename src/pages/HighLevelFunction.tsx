@@ -9,7 +9,8 @@ import {columns, DataType} from "../components/TxTable";
 type Props = {
   priceFunction: (Y: Big, X: Big, dx: Big) => Big,
   constantCalc: (Y: Big, X: Big) => Big,
-  title: string
+  title: string,
+  priceEquation: string
 }
 
 export const HighLevelFunction = ({priceFunction, constantCalc, title} : Props) => {
@@ -122,8 +123,8 @@ export const HighLevelFunction = ({priceFunction, constantCalc, title} : Props) 
       dy: `+${DY.toFixed(5)}`,
       price: `${price.toFixed(5)}`,
       fees: `${paidFees.toFixed(5)} A`,
-      liqX: newY.toFixed(5),
-      liqY: newX.toFixed(5),
+      liqX: newX.toFixed(5),
+      liqY: newY.toFixed(5),
       curve: `${curve}`
     }
     setData([...data, swap])
@@ -160,7 +161,7 @@ export const HighLevelFunction = ({priceFunction, constantCalc, title} : Props) 
           <Form layout="inline" style={{marginBottom: 20}}>
             <Form.Item label="Tokens:"><InputNumber value={dy} addonAfter="dy" min={0} disabled={true}/></Form.Item>
             <Form.Item><InputNumber value={dx} addonAfter="dx" onChange={setSwapTokenX} min={0} disabled={!addDisabled}/></Form.Item>
-            <Form.Item label="Price"><b>{price.toFixed(5)} B/A</b></Form.Item>
+            <Form.Item label="Price"><b>{price.toFixed(5)}</b></Form.Item>
             <Form.Item label=""><Button onClick={buyTokenX} type="primary" disabled={!addDisabled}>Buy X</Button></Form.Item>
           </Form>
           <Table columns={columns} dataSource={data} />
